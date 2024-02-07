@@ -1,23 +1,22 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>WebRTC Video Chat</title>
-<link rel="stylesheet" href="styles.css">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="stylesheet" href="style.css">
+  <title>WebRTC</title>
 </head>
 <body>
-<div class="container">
-  <h1>WebRTC Video Chat</h1>
-  <div class="form">
-    <label for="yourID">Your Identifier:</label>
-    <input type="text" id="yourID" placeholder="Your Identifier"><br>
-    <label for="otherID">Other Person's Identifier:</label>
-    <input type="text" id="otherID" placeholder="Other Person's Identifier"><br>
-    <button onclick="startVideoChat()">Start Video Chat</button>
-  </div>
-  <div id="videoContainer" class="video-container"></div>
-</div>
-<script src="script.js"></script>
+  <h1>WebSocket Client</h1>
+  <input type="text" id="messageInput" placeholder="Type a message">
+  <button onclick="sendMessage(event.target.value)">Send</button>
+
+  <h2>Local Video</h2>
+  <video id="localVideo" autoplay></video>
+
+  <h2>Remote Video</h2>
+  <video id="remoteVideo" autoplay></video>
+
+  <script src="script.js"></script>
 </body>
 </html>
