@@ -9,37 +9,35 @@ function connect() {
 
   ws.onmessage = function(event) {
     console.log('WebSocket sent message: ');
-    console.log(JSON.parse(event.data));
 
-    const sessionDescription = new RTCSessionDescription(JSON.parse(event.data));
-    
-    // Set the remote description of the peer connection
-    peerConnection.setRemoteDescription(sessionDescription)
+    const message = JSON.parse(event.data);
+
+    if(message.type == 'offer'){
+      console.log('Offer recived');
+      input.value = JSON.stringify(message.data);
+      createAnswer(JSON.parse(input.value))
       .then(() => {
-        console.log('Remote description set successfully.');
-      })
-      .catch(error => {
-        console.error('Error setting remote description:', error);
-      });
+        createAnswer(JSON.parse(input.value))
+        .then((value) => {
+          input.value = JSON.stringify(value);
 
-    // Listen for the 'ontrack' event
-    peerConnection.ontrack = event => {
-      if (!remoteVideo.srcObject) {
-        setTimeout(function() {
-          console.log(event.streams[0]);
-          remoteVideo.srcObject = event.streams[0];
-          console.log('Remote video stream set successfully.');
-        }, 1000);
-      }
-    };
+          sendMessage(JSON.stringify({
+            'type': 'answer',
+            'data': JSON.parse(JSON.stringify(value))
+          }));
+        });
+      });
+    } else if(message.type == 'answer'){
+      console.log('Answer recived');
+      addAnswer(message.data);
+    }
   };
 
   ws.onclose = function() {
     console.log('WebSocket closed');
   };
 }
-
-function sendMessage(message) {
+function sendMessage(message){
   if (ws && ws.readyState === WebSocket.OPEN) {
     ws.send(message);
   }
@@ -47,50 +45,76 @@ function sendMessage(message) {
 connect();
 
 // Camera code
+let peerConnection = new RTCPeerConnection()
+let localStream;
+let remoteStream;
 
-var peerConnection;
-var configuration;
+const input = document.getElementById('input');
 
-// Initialize variables for local and remote videos
-const remoteVideo = document.getElementById('localVideo');
-const localVideo = document.getElementById('remoteVideo');
+async function init(){
+  localStream = await navigator.mediaDevices.getUserMedia({video:true, audio:true})
+  remoteStream = new MediaStream()
+  document.getElementById('localVideo').srcObject = localStream
+  document.getElementById('remoteVideo').srcObject = remoteStream
 
-function handleSuccess(stream) {
-  // Assign local stream to local video element
-  localVideo.srcObject = stream;
-
-  // Create RTCPeerConnection object
-  configuration = { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] };
-  peerConnection = new RTCPeerConnection(configuration);
-
-  // Add local stream to peer connection
-  stream.getTracks().forEach(track => {
-      peerConnection.addTrack(track, stream);
+  localStream.getTracks().forEach((track) => {
+    peerConnection.addTrack(track, localStream);
   });
 
-  // Set up event handlers for peer connection
-  peerConnection.ontrack = event => {
-      // When remote stream is added, show it in remote video element
-      remoteVideo.srcObject = event.streams[0];
+  peerConnection.ontrack = (event) => {
+      event.streams[0].getTracks().forEach((track) => {
+      remoteStream.addTrack(track);
+    });
+  };
+}
+
+let newOffer;
+async function createOffer(){
+  console.log('Offer made');
+  peerConnection.onicecandidate = async (event) => {
+    if(event.candidate){
+      newOffer = (JSON.stringify(peerConnection.localDescription));
+    }
   };
 
-  // Create offer
-  peerConnection.createOffer()
-      .then(offer => peerConnection.setLocalDescription(offer))
-      .then(() => {
-        console.log('Offer created:', peerConnection.localDescription);
-
-        sendMessage(JSON.stringify(peerConnection.localDescription));
-      })
-      .catch(error => console.error('Error creating offer:', error));
+  const offer = await peerConnection.createOffer();
+  await peerConnection.setLocalDescription(offer);
+  return offer;
 }
 
-// Function to handle when getUserMedia fails
-function handleError(error) {
-  console.error('Error accessing media devices:', error);
+let newAnswer;
+async function createAnswer(offer){
+  console.log('Answer made');
+  peerConnection.onicecandidate = async (event) => {
+    if(event.candidate){
+        newAnswer = JSON.stringify(peerConnection.localDescription)
+    }
+  };
+
+  await peerConnection.setRemoteDescription(offer);
+
+  let answer = await peerConnection.createAnswer();
+  await peerConnection.setLocalDescription(answer); 
+  return answer;
 }
 
-// Get user media (in this case, just video)
-navigator.mediaDevices.getUserMedia({ video: true })
-  .then(handleSuccess)
-  .catch(handleError);
+async function addAnswer(answer){
+  console.log('Answer added');
+  if (!peerConnection.currentRemoteDescription){
+    peerConnection.setRemoteDescription(answer);
+  }
+}
+
+init();
+
+function load(){
+  if(document.getElementById('isHost').checked){
+    createOffer()
+    .then((value) => {
+      sendMessage(JSON.stringify({
+        'type': 'offer',
+        'data': value
+      }));
+    });
+  }
+}

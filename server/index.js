@@ -16,7 +16,9 @@ wss.on('connection', function connection(ws) {
 
     // Send to all clients
     clients.forEach(client => {
-      client.send(message.toString());
+      if(client != ws){
+        client.send(message.toString());
+      }
     });
   });
 
