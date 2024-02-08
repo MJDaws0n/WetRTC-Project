@@ -5,6 +5,12 @@ function connect() {
 
   ws.onopen = function() {
     console.log('WebSocket connected');
+    sendMessage(JSON.stringify({
+      type: 'welcome',
+      id: personalID,
+      other: otherID
+    }));
+    document.getElementById('state').innerText = 'Connected';
   };
 
   ws.onmessage = function(event) {
@@ -12,29 +18,45 @@ function connect() {
 
     const message = JSON.parse(event.data);
 
+    if(message.type == 'welcome'){
+      if(message.wait == 'true'){
+        console.log('Connected to server successfully. Waiting for other client');
+      } else{
+        console.log('Connected to server successfully. Connecting to other client');
+        load();
+      }
+    }
+
     if(message.type == 'offer'){
       console.log('Offer recived');
       input.value = JSON.stringify(message.data);
-      createAnswer(JSON.parse(input.value))
-      .then(() => {
-        createAnswer(JSON.parse(input.value))
-        .then((value) => {
-          input.value = JSON.stringify(value);
 
+      createAnswer(message.data)
+      .then((value) => {
+        setTimeout(()=>{
           sendMessage(JSON.stringify({
-            'type': 'answer',
-            'data': JSON.parse(JSON.stringify(value))
+            type: 'answer',
+            data: input.value 
           }));
-        });
+        }, 500)
       });
-    } else if(message.type == 'answer'){
+      document.getElementById('call_state').innerText = 'Connected';
+    }
+    
+    if(message.type == 'answer'){
       console.log('Answer recived');
-      addAnswer(message.data);
+
+      input.value = message.data;
+
+      addAnswer(JSON.parse(input.value));
+
+      document.getElementById('call_state').innerText = 'Connected';
     }
   };
 
   ws.onclose = function() {
     console.log('WebSocket closed');
+    document.getElementById('state').innerText = 'Connected';
   };
 }
 function sendMessage(message){
@@ -42,7 +64,6 @@ function sendMessage(message){
     ws.send(message);
   }
 }
-connect();
 
 // Camera code
 let peerConnection = new RTCPeerConnection()
@@ -70,9 +91,9 @@ async function init(){
 
 let newOffer;
 async function createOffer(){
-  console.log('Offer made');
   peerConnection.onicecandidate = async (event) => {
     if(event.candidate){
+      console.log('Offer made');
       newOffer = (JSON.stringify(peerConnection.localDescription));
     }
   };
@@ -82,12 +103,11 @@ async function createOffer(){
   return offer;
 }
 
-let newAnswer;
 async function createAnswer(offer){
   console.log('Answer made');
   peerConnection.onicecandidate = async (event) => {
     if(event.candidate){
-        newAnswer = JSON.stringify(peerConnection.localDescription)
+      input.value = JSON.stringify(peerConnection.localDescription)
     }
   };
 
@@ -108,13 +128,11 @@ async function addAnswer(answer){
 init();
 
 function load(){
-  if(document.getElementById('isHost').checked){
-    createOffer()
-    .then((value) => {
-      sendMessage(JSON.stringify({
-        'type': 'offer',
-        'data': value
-      }));
-    });
-  }
+  createOffer()
+  .then((value) => {
+    sendMessage(JSON.stringify({
+      type: 'offer',
+      data: value
+    }));
+  });
 }
